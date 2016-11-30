@@ -891,7 +891,7 @@ class ExecuteESQueries:
 
 
         # if you make changes here, you must make equivalent changes in SelectExtractors.extract_locations (go right to the end of that func.)
-        answer['city_dict'] = json.load(open(city_dict)) # dictionary required by Majid
+        answer['city_dict'] = city_dict # dictionary required by Majid
         # answer['city_state_dict'] = json.load(open(city_state_dict))
         # answer['country_dict'] = json.load(open(country_dict))
         # print type(classifier_cities)
@@ -919,10 +919,11 @@ class ExecuteESQueries:
         # print parsed_PF_queries
         parsed_PF_queries = json.load(parsed_query_file_in)['Point Fact']
         parsed_query_file_in.close()
-        url_localhost = "http://10.1.94.103:9201/"
+        # url_localhost = "http://10.1.94.103:9201/"
         # url_localhost = "http://localhost:9200"
+        url_localhost = "http://memex:digdig@52.36.12.77:8080/"
         es = Elasticsearch(url_localhost)
-        index = 'dig-nov-eval-gt-02'
+        index = 'dig-nov-eval-gt-04'
         # index = 'gt-index-1'
         results = None
         # with codecs.open(raw_query_file, 'r', 'utf-8') as f:
@@ -976,12 +977,12 @@ class ExecuteESQueries:
                     # break
 
     @staticmethod
-    def November_2016_pre_execution2(file_to_run):
+    def November_2016_pre_execution2():
         """
         If necessary:
 
         1. Paths must be changed in: this function, TableFunctions.build_match_clause_with_keyword_expansion,
-        MappingTable (if you change the table)
+        MappingTable (at the bottom; if you change the table)
 
         2. Index, elasticsearch IP must be changed in: this function, SparqlTranslator.translateClusterQueries
 
@@ -1000,42 +1001,33 @@ class ExecuteESQueries:
         :return: None
         """
         root_path = '/Users/pszekely/memex-nov-query/'
-        embedding_training_folder = 'embedding_training_files/'
-        embedding_training_file = 'lrr_unigram-v2.json'
-        ads_table_file = 'adsTable-v3.jl'
-        # url_localhost = "http://10.1.94.103:9201/"
-        url_localhost = "http://memex:digdig@52.36.12.77:8080/"
-        index = 'dig-nov-eval-gt-04'
-        ads_table_file = root_path +  ads_table_file
-        parsed_query_prefix = '/Users/pszekely/github/dig/dig-groundtruth-data/memex-2016-october-eval/nov-queries-parsed/'
-        parsed_query_file = parsed_query_prefix + file_to_run + '.json'
-        output_folder = 'answers/' + file_to_run + '/'
+
         # set use_embeddings to True if you want to use Rahul's code. You can replace the unigram file with a different
         # one if it improves performance (e.g. lrr, hrr, ground-truth etc.)
         #the function name is a complete misnomer. We must call it for Majid's code.
-
-        classifiers = ExecuteESQueries.train_embedding_classifiers(root_path+embedding_training_folder,
-                                root_path+embedding_training_folder+embedding_training_file, use_embeddings=True)
+        classifiers = ExecuteESQueries.train_embedding_classifiers(root_path+'embedding_training_files/',
+                                root_path+'embedding_training_files/lrr_unigram-v2.json', use_embeddings=True)
 
         # if anything changes in the mapping table, regenerate this file; see the last line in MappingTable.py
+        ads_table_file = root_path + 'adsTable-v3.jl'
 
+        parsed_query_file = root_path + 'nov-queries-parsed/post_point_fact_parsed.json'
         parsed_query_file_in = codecs.open(parsed_query_file, 'r', 'utf-8')
         parsed_PF_queries = json.load(parsed_query_file_in)#[0:1]
         # print len(parsed_PF_queries)
         # print parsed_PF_queries
         parsed_query_file_in.close()
-
+        url_localhost = "http://memex:digdig@52.36.12.77:8080/"
+        # url_localhost = "http://10.1.94.103:9201/"
         # url_localhost = "http://localhost:9200"
         es = Elasticsearch(url_localhost)
-
+        index = 'dig-nov-eval-gt-04'
         # index = 'gt-index-1'
         results = None
 
         # if something goes wrong, you'll know where in the list it occurred
         for k in range(0, len(parsed_PF_queries)):
-            # print k
-            # if parsed_PF_queries[k]['id'] != "95-2":
-            #     continue
+            print k
             sparql_query = parsed_PF_queries[k]['SPARQL']
             print 'processing query...',
             print parsed_PF_queries[k]['id']
@@ -1049,12 +1041,6 @@ class ExecuteESQueries:
             translatedDS = SparqlTranslator.SparqlTranslator.translateToDisMaxQuery(sparql_query, ads_table_file, False)
             # query['query'] = TableFunctions.build_match_all_query()
             query['query'] = translatedDS['query']
-            query['_source'] = dict()
-            query['_source']['exclude'] = ["tokens_extracted_text",
-                                                           "tokens_high_precision",
-                                                           "tokens_high_recall",
-                                                           "tokens_title",
-                                                           "tokens"]
 
             ## use these print statements for debugging
             # pp.pprint(query['query']['dis_max']['queries'][2])
@@ -1063,20 +1049,14 @@ class ExecuteESQueries:
             # outtmp.close()
             # print query
             # pp.pprint(query)
-            out = codecs.open('/tmp/query_tmp.json', 'w', 'utf-8')
-            json.dump(query, out)
-            out.close()
+            # out = codecs.open(root_path+'query_tmp.json', 'w', 'utf-8')
+            # json.dump(query, out)
+            # out.close()
             try:
-                retrieved_frames = es.search(index=index, doc_type='ads', size=150, body=query, request_timeout=60)
-            except Exception as e:
-                print e
-                print "Trying query with size 50"
-                try:
-                    retrieved_frames = es.search(index=index, doc_type='ads', size=50, body=query, request_timeout=60)
-                except:
-                    print "Query ", str(parsed_PF_queries[k]['id']), "failed twice, skipping ..."
-                    continue
 
+                retrieved_frames = es.search(index=index, doc_type='ads', size=500, body=query)
+            except:
+                pass
             if not retrieved_frames['hits']['hits']:
                 print 'no results'
             else:
@@ -1090,7 +1070,7 @@ class ExecuteESQueries:
                     bindings_dict = (ExecuteESQueries._wrap_results_isd_format(results, k))
 
                     # everything gets written out to a folder
-                    output_file = root_path + output_folder + str(parsed_PF_queries[k]['id'])
+                    output_file = root_path + 'output-folder-3/' + str(parsed_PF_queries[k]['id'])
                     file = codecs.open(output_file, 'w', 'utf-8')
                     json.dump(bindings_dict, file)
                     file.close()
@@ -1099,8 +1079,9 @@ class ExecuteESQueries:
 # root_path = '/Users/mayankkejriwal/datasets/memex-evaluation-november/'
 # classifiers = ExecuteESQueries.train_embedding_classifiers(root_path + 'embedding_training_files/',
 #                                                                        root_path + 'unigram-part-00000-v2.json')
-
-# ExecuteESQueries.November_2016_pre_execution2('post_aggregate_parsed_fixed')
+# import nltk
+# nltk.
+ExecuteESQueries.November_2016_pre_execution2()
 # ExecuteESQueries.test_ES_index()
 # ExecuteESQueries._current_trial()
 # path = '/Users/mayankkejriwal/datasets/memex-evaluation-november/'
@@ -1114,12 +1095,3 @@ class ExecuteESQueries:
 # raw_sparql_queries = root_path+'raw-queries-ground-truth.txt'
 # ExecuteESQueries.trial_v3_queries(raw_sparql_queries, ads_table)
 
-from optparse import OptionParser
-
-if __name__ == '__main__':
-    parser = OptionParser()
-
-    (c_options, args) = parser.parse_args()
-    input_path = args[0]
-
-    ExecuteESQueries.November_2016_pre_execution2(input_path)

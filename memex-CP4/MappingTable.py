@@ -365,4 +365,4 @@ class MappingTable:
             file.close()
 
 
-# MappingTable.buildAdsTable_v3('/home/mayankkejriwal/Downloads/memex-cp2/nov-2016/adsTable-v3.jl')
+# MappingTable.buildAdsTable_v3('/Users/pszekely/memex-nov-query/adsTable-v3.jl')
